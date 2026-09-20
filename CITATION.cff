@@ -9,7 +9,7 @@ authors:
     affiliation: "DeepSeek Harness"
 repository-code: "https://github.com/anticipate218/invention-patent-skill"
 license: MIT
-version: "1.0.0"
+version: "1.1.0"
 date-released: 2026-09-20
 keywords:
   - patent
