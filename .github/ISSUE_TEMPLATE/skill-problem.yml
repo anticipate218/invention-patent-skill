@@ -1,0 +1,74 @@
+name: Bug 报告
+description: 报告脚本、模板或文档中的错误
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        报告脚本问题前，请先确认你跑的是本仓库最新版本，并贴出**完整命令与完整输出**。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题出在哪
+      options:
+        - scripts/check_patent.py（申请文件自检）
+        - scripts/check_latex.py（LaTeX 模板编译体检）
+        - scripts/make_docx.py（转 Word）
+        - scripts/install_skill.py（安装器）
+        - scripts/validate_skill.py（技能结构校验）
+        - assets/latex/（模板本身编不过 / 版式不对）
+        - references/ 或 assets/ 文档内容有误
+        - 其它
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: 你运行的命令与完整输出
+      description: 用代码块贴出，不要只描述
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 操作系统、Python 版本、TeX 发行版（如果涉及 LaTeX）
+      placeholder: "Windows 11 / Python 3.13.5 / MiKTeX 24.x"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 技能版本
+      description: 取自 SKILL.md 的 metadata.version，或 git rev-parse --short HEAD
+    validations:
+      required: true
+
+  - type: textarea
+    id: minimal
+    attributes:
+      label: 最小复现输入（自检类问题必填）
+      description: 能触发该问题的最小 Markdown 申请文件片段
+      render: markdown
+    validations:
+      required: false

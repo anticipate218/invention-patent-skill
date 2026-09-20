@@ -1,0 +1,42 @@
+# 依赖
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# 构建/输出
+dist/
+build/
+*.log
+
+# 转档与交付产物（避免误提交生成的申请文件成品、私人交底书与答复稿）
+*.docx
+交底书*
+答复意见书*
+审查意见通知书*
+oa-response*
+
+# LaTeX 编译中间产物（模板源码与 refs.bib 要提交，编译垃圾不要）
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.out
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.run.xml
+*-blx.bib
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp

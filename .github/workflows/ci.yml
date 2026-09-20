@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 校验技能结构（frontmatter / 篇幅 / 文件引用 / 索引完整性）
+        run: python scripts/validate_skill.py . --strict
+
+      # 这是用户最常跑的脚本，9 类检查的每条规则都得有固件兜住：
+      # 尤其是「应当报错的必须报错」和「不该误报的不能误报」两侧。
+      - name: 申请文件自检工具固件测试
+        run: python scripts/check_patent.py --self-test
+
+      # 安装器是用户碰到的第一个脚本，"装错地方 / 覆盖掉别人的技能" 这类事故
+      # 代价很高，所以它的安全约定必须有固件测试兜住。
+      # 这个自检全程不联网、也不碰真实的技能目录（在临时目录里造假的源包与目标）。
+      - name: 安装器固件测试（安全约定 / ZIP 解包 / 目标解析）
+        run: python scripts/install_skill.py --self-test
+
+      - name: Word 生成器固件测试（OOXML 结构 / 版式参数 / 逐字节可复现）
+        run: python scripts/make_docx.py --self-test
+
+      - name: 范例草稿仍能通过机械自检
+        run: python scripts/check_patent.py examples/draft-example.md --strict
+
+      # README 里那句「一句话安装」把 raw 链接当作唯一入口；链接写错或文件没推上去，
+      # 用户复制过去就是一个 404。这里把这条契约钉死在 CI 里。
+      - name: 安装入口文档存在且被引用
+        run: |
+          test -f INSTALL.md
+          grep -q 'INSTALL.md' README.md
+          grep -q 'INSTALL.md' SKILL.md
+          echo "INSTALL.md 入口检查通过"
+
+      # 脚本必须保持纯标准库（唯一的例外是 check_latex.py 调用本机的 TeX 命令，
+      # 那是子进程而不是 import）。这条约束是给"装了 Python 就能跑"的承诺兜底的。
+      - name: 脚本依赖检查（只应依赖标准库）
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          stdlib = set(sys.stdlib_module_names)
+          local = {p.stem for p in pathlib.Path("scripts").glob("*.py")}
+          banned_external = {"requests", "numpy", "docx", "lxml", "yaml", "bs4", "pypdf"}
+          bad = []
+          for p in sorted(pathlib.Path("scripts").glob("*.py")):
+              tree = ast.parse(p.read_text(encoding="utf-8"))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      names = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      names = [(node.module or "").split(".")[0]]
+                  else:
+                      continue
+                  for n in names:
+                      if not n or n in stdlib or n in local or n == "__future__":
+                          continue
+                      if n in banned_external:
+                          bad.append("%s: 引用了被禁止的外部依赖 %s" % (p, n))
+                      else:
+                          bad.append("%s: 疑似非标准库依赖 %s（如确为标准库请加进白名单）" % (p, n))
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("依赖检查通过：scripts/ 只用标准库")
+          PY
+
+      - name: 校验评测用例为合法 JSON
+        run: |
+          python - <<'PY'
+          import json
+          for f in ("evals/evals.json", "evals/trigger-queries.json"):
+              with open(f, encoding="utf-8") as fh:
+                  data = json.load(fh)
+              print(f, "OK", type(data).__name__)
+          PY
+
+      - name: 校验 CITATION.cff 关键字段
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          text = pathlib.Path("CITATION.cff").read_text(encoding="utf-8")
+          for field in ("cff-version:", "title:", "version:", "license:"):
+              if field not in text:
+                  print("CITATION.cff 缺字段", field); sys.exit(1)
+          print("CITATION.cff 检查通过")
+          PY
+
+      # 这一步的判据是"某个受管目录名紧跟一个反斜杠"。
+      # 注意：写文档时不要在 *.md 里逐字引用下面这条正则（连"目录名 + 反斜杠"的
+      # 片段也不要抄），否则文档会把自己举报成违规。
+      # 描述这条检查时请用文字转述，例如"目录名紧跟反斜杠的 Windows 风格路径"。
+      - name: 检查是否有 Windows 风格路径
+        run: |
+          if grep -rnE '(references|scripts|assets|evals|examples)\\' --include='*.md' .; then
+            echo "发现反斜杠路径，请统一为正斜杠"; exit 1
+          fi
+          echo "路径风格检查通过"
+
+  latex:
+    name: LaTeX 模板真编译
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 先跑不依赖 TeX 的解析逻辑固件测试：这样即使 TeX 安装出问题，
+      # 也能立刻分清是"脚本坏"还是"发行版缺宏包"。
+      - name: 日志解析 / 字体替换 / 顺序核对 固件测试（不需要 TeX）
+        run: python scripts/check_latex.py --self-test
+
+      # 模板用到的宏包：ctex + fandol 字体、geometry、fancyhdr、lastpage、
+      # amsmath/amssymb、booktabs、array、graphicx、enumitem、hyperref。
+      # 全部来自 texlive-latex-base/recommended/extra + texlive-xetex +
+      # texlive-lang-chinese，不需要额外的顶层包。
+      - name: 安装 TeX Live（xelatex / bibtex）
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            texlive-xetex \
+            texlive-lang-chinese
+          for pkg in ctex.sty geometry.sty fancyhdr.sty lastpage.sty booktabs.sty \
+                     enumitem.sty hyperref.sty amsmath.sty graphicx.sty; do
+            kpsewhich "$pkg" || { echo "缺宏包：$pkg"; exit 1; }
+          done
+          xelatex --version | head -n 1
+          bibtex --version | head -n 1
+
+      # 真正把模板编译一遍：xelatex → bibtex → 再两遍，
+      # 然后核对硬错误、未解析引用/交叉引用、字体替换情况、页数下限，
+      # 以及"一级部件顺序""说明书五部分顺序""版式参数""权利要求编号与引用"
+      # 这些结构性约束。
+      #
+      # 注意 check_latex.py 在临时目录里编译，默认把 fontset=windows 换成
+      # fandol（Linux 上没有 Windows 字体）。要验原始文件就加 --keep-fontset。
+      - name: 编译 CNIPA 模板并体检
+        run: python scripts/check_latex.py --require

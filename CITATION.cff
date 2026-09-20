@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "如果本技能对你的撰写或答复工作有帮助，请按以下方式引用："
+title: "invention-patent-skill"
+abstract: "面向 AI 助手的发明专利申请技能：把技术交底书变成申请文件，覆盖权利要求书与说明书撰写、摘要与附图标记合规、审查意见答复与修改边界自检，依据《专利法》《专利法实施细则》《专利审查指南》的现行条款。"
+type: software
+authors:
+  - family-names: "DSH Agent"
+    given-names: ""
+    affiliation: "DeepSeek Harness"
+repository-code: "https://github.com/anticipate218/invention-patent-skill"
+license: MIT
+version: "1.0.0"
+date-released: 2026-09-20
+keywords:
+  - patent
+  - invention-patent
+  - agent-skills
+  - claims-drafting
+  - patent-prosecution
+  - cnipa

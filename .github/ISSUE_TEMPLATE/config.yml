@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安装与使用说明
+    url: https://github.com/anticipate218/invention-patent-skill#readme
+    about: 装不上、装完不生效、不知道从哪开始？先看 README 与 INSTALL.md
+  - name: 这不是法律咨询渠道
+    url: https://github.com/anticipate218/invention-patent-skill/blob/main/README.md#免责声明
+    about: 本技能不提供法律意见。请不要在此提问"我这件能不能授权""会不会侵权"——这类问题请咨询执业专利代理师

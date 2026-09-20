@@ -1,0 +1,66 @@
+name: 规则更新
+description: 报告专利法 / 实施细则 / 审查指南 / 收费标准等规则的修订或错漏
+title: "[规则更新] "
+labels: ["规则更新"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助这个技能保持准确与时效。**请务必填全下面每一项**——
+        缺官方链接或生效日期的规则变更我们无法核实，只能先挂起。
+
+  - type: input
+    id: document
+    attributes:
+      label: 涉及的文件与条款
+      description: 例如「《专利法实施细则》第 25 条」「《专利审查指南》第二部分第二章 2.2.6」
+      placeholder: "《专利法实施细则》第 25 条"
+    validations:
+      required: true
+
+  - type: textarea
+    id: old-text
+    attributes:
+      label: 旧文本（本技能目前写的内容）
+      description: 贴出本仓库里需要改的原文，并给出文件与行号
+      placeholder: |
+        references/claims.md:120
+        （原文……）
+    validations:
+      required: true
+
+  - type: textarea
+    id: new-text
+    attributes:
+      label: 新文本（官方原文）
+      description: 直接贴官方原文，不要转述
+    validations:
+      required: true
+
+  - type: input
+    id: source-url
+    attributes:
+      label: 官方来源链接
+      description: CNIPA 官网 > 官方法律数据库 > 其它。**没有链接的规则变更不予合并**
+      placeholder: "https://www.cnipa.gov.cn/..."
+    validations:
+      required: true
+
+  - type: input
+    id: effective-date
+    attributes:
+      label: 检索日期 / 生效日期
+      description: 例如「检索日期 2026-09-20；自 2024-01-20 起施行」
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 受影响的文件与脚本
+      description: 除 references/ 文档外，凡写进脚本的阈值、字段或检查项也要一并列出
+      placeholder: |
+        - references/claims.md
+        - scripts/check_patent.py（check_claims 里的 …）
+    validations:
+      required: false
