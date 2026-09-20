@@ -8,7 +8,7 @@ description: >-
 license: MIT
 metadata:
   author: anticipate218
-  version: "1.1.0"
+  version: "1.2.0"
   language: zh-CN
 compatibility: 可选依赖 Python 3.9+；scripts/ 下全部脚本只用标准库（check_latex.py 需本机 TeX 发行版提供 xelatex/bibtex）；LaTeX 模板需 ctex 等宏包，见 assets/latex/README.md
 ---
@@ -37,7 +37,8 @@ compatibility: 可选依赖 Python 3.9+；scripts/ 下全部脚本只用标准�
 |---|---|
 | **现在处于哪一段** | 只有交底书？已经定稿要自检？还是收到了审查意见通知书？三段要做的事完全不同 |
 | **保护客体是什么** | 产品/装置、方法/工艺、还是计算机程序+算法；决定了权项怎么写、要不要考虑客体审查 |
-| **交付物是什么** | Markdown 草稿、LaTeX（`assets/latex/cnipa/`）、还是 Word（`scripts/make_docx.py`） |
+| **交付物是什么** | Markdown 草稿、LaTeX（`assets/latex/cnipa/`）、Word（`scripts/make_docx.py`），还是要**一次拿到整包投稿文件**（`scripts/build_all.py`） |
+| **手上有没有交底书** | 有交底书就能一键出初稿（`scripts/gen_draft.py`）；只有口头描述就先走第 2 步把它整理成交底书 |
 
 **本技能只覆盖发明专利。** 实用新型不写权利要求书之外的东西但必须有附图（细则第 20 条第 5 款）、不经实质审查；外观设计根本不写权利要求书。用户问的是这两种时，先说明边界再决定是否继续。
 
@@ -47,6 +48,8 @@ compatibility: 可选依赖 Python 3.9+；scripts/ 下全部脚本只用标准�
 |---|---|---|
 | 一段技术描述 / 交底书 | 提炼发明点 → 布局权项 → 写说明书 | `references/drafting-playbook.md` |
 | 已有草稿，要检查形式 | 跑脚本 + 过清单 | `references/checklists.md`、`references/format.md` |
+| 交底书已经成型，想先出一版初稿 | 一键生成，再逐条读缺口 | `scripts/gen_draft.py`（第 7.5 步） |
+| 草稿定了，要能提交的整包文件 | 一键出 Word + LaTeX(+PDF) + 自检报告 | `scripts/build_all.py`（第 7.5 步） |
 | 审查意见通知书 | 先看缺陷类型，再定答复与修改 | `references/prosecution.md`、`references/examination.md` |
 | 问"这样写行不行 / 能不能授权" | 讲规则与判例框架，**不给结论** | `references/examination.md` |
 | 问流程、期限、费用、优先权、分案 | 直接查期限表 | `references/procedure.md` |
@@ -129,7 +132,7 @@ python scripts/check_patent.py --self-test           # 脚本自身的固件测�
 
 ## 第 7 步：产出正式格式
 
-三条产出路线（详见 `references/templates.md`）：
+三条产出路线 + 一键整包（详见 `references/templates.md`）：
 
 | 目标 | 用什么 | 说明 |
 |---|---|---|
@@ -144,6 +147,45 @@ python scripts/check_latex.py              # 真编译（需本机有 TeX 发行
 python scripts/check_latex.py --require    # CI 用：没有引擎时也报失败
 python scripts/check_latex.py --self-test  # 只跑逻辑测试，不需要 TeX
 ```
+
+## 第 7.5 步：一键出稿 / 一键出格式
+
+前七步是**人写**的流程；用户说"帮我先出一版"或"给我能提交的文件"时，用这两个脚本把手工步骤串起来。它们只做**搬运、编号、套模板、排版和自检**，不产生任何交底书里没有的技术内容。
+
+### 一键出初稿：交底书 → 申请文件草稿
+
+```bash
+python scripts/gen_draft.py --template > 交底书.md      # 先拿一份交底书填空模板
+python scripts/gen_draft.py 交底书.md -o 我的申请.md      # 生成草稿（测一遍机械自检）
+python scripts/gen_draft.py 交底书.md -o 我的申请.md --strict      # 连「需要复核」也当失败
+python scripts/gen_draft.py 交底书.md -o 我的申请.md --allow-gaps  # 明知有洞，先出一版
+```
+
+交底书用 `##` 分节（节名容错：`技术领域`／`所属技术领域`、`背景技术`／`现有技术`、`技术问题`……），输出就是第 3～5 步那套结构（`# 发明名称：…` + 摘要 / 权利要求书 / 说明书五部分 / 说明书附图），也就是 `check_patent.py` 能直接自检的结构。
+
+**它绝不替你编技术方案**：交底书没给的东西留成显式缺口（`（交底书未给出名称）`、`…（请补：…）`），并在报告里逐条列出；有缺口时退出码是 1，`--allow-gaps` 只是让你显式承认"我知道有洞"。可直接改的填空模板是 `assets/patent-outline.md`，完整交底书范例是 `examples/disclosure-example.md`。
+
+### 一键出投稿格式：草稿 → 整包文件
+
+```bash
+python scripts/build_all.py 我的申请.md -o 输出目录              # Word + LaTeX + 自检报告
+python scripts/build_all.py 我的申请.md -o 输出目录 --pdf        # 额外真编译一份 PDF
+python scripts/build_all.py 我的申请.md -o 输出目录 --no-para-number  # 电子申请：去掉说明书段号
+```
+
+一次产出：
+
+| 产物 | 说明 |
+|---|---|
+| `01-说明书摘要.docx` / `02-权利要求书.docx` / `03-说明书.docx` / `04-说明书附图.docx` | **按 CNIPA 电子申请的部件分别成文**——上传入口本来就按部件分，合成一个文件反而要再拆 |
+| `src/*.md` | 四个部件各自的 Markdown 源文，便于逐件核对与复用 |
+| `latex/main.tex` + `latex/refs.bib` | 可编译的申请文件源（`--pdf` 时用本机 xelatex 编出 PDF） |
+| `自检报告.txt` / `自检报告.json` | `check_patent.py` 的机械校验 + `check_latex.py` 的结构性检查（不编译）+ 生成说明 + 仍需人工处理的事项 |
+| `manifest.json` | 每个产物的相对路径、字节数与 sha256（可复现：不含时间戳与绝对路径；`--pdf` 的 PDF 例外，xelatex 会往 PDF 里写生成时间） |
+
+退出码：`2` 用法/输入有问题（草稿不存在、缺发明名称、缺权利要求书或说明书）；`1` 机械自检不过、LaTeX 结构不被豁免地不过、或 `--pdf` 编译失败；`0` 通过。
+
+**"一键"只省手工，不省判断。** 生成器不补技术内容，报告里也**不掩盖**问题：读不懂的报告项、`【仍需人工处理的事项】` 那一节、以及第 6 步的免责声明，全都照旧适用——**机械校验通过仍然 ≠ 法律合规**。
 
 ## 第 8 步：答复审查意见
 
@@ -189,19 +231,22 @@ python scripts/check_latex.py --self-test  # 只跑逻辑测试，不需要 TeX
 | 答复审查意见：通知书类型、修改边界、三步法论证 | `references/prosecution.md` |
 | 流程、法定期限、优先权、分案、期限计算与延长、复审无效 | `references/procedure.md` |
 | 提交前逐项自查清单 | `references/checklists.md` |
-| 模板、编译报错、转 Word、产出路线对比 | `references/templates.md` |
+| 模板、编译报错、转 Word、产出路线对比、一键路径的命令与产物 | `references/templates.md` |
 | 要找官方来源链接、法规现行版本 | `references/sources.md` |
 | 一页纸红线速查（可打印） | `assets/cheatsheet.md` |
 | 可填空的整体骨架 | `assets/patent-outline.md` |
 | 权利要求书现成片段（1 独权 + 4 从权，含多项从属） | `assets/claims-template.md` |
 | 摘要现成片段 + 300 字格式红线 | `assets/abstract-template.md` |
 | 要能直接编译的 LaTeX 申请文件模板 | `assets/latex/cnipa/main.tex`（先读 `assets/latex/README.md`） |
+| 要把一份技术交底书一键转成申请文件草稿，或先拿一份交底书填空模板 | `scripts/gen_draft.py`（`--template` / `--strict` / `--allow-gaps` / `--json`） |
+| 要把草稿一键输出成整包投稿文件（分部件 Word、LaTeX、PDF、自检报告、manifest） | `scripts/build_all.py`（`--pdf` / `--no-para-number` / `--keep-fontset` / `--strict`） |
 | 机械自检草稿 / 生成骨架 | `scripts/check_patent.py`（`--init` / `--json` / `--strict` / `--self-test`） |
 | 确认 LaTeX 模板还能编过、版式对不对 | `scripts/check_latex.py`（`--require` / `--self-test` / `--keep`） |
 | Markdown 草稿转 Word、体检已有 docx | `scripts/make_docx.py`（`-o` / `--para-number` / `--inspect`） |
 | 校验技能自身结构（frontmatter/篇幅/文件引用） | `scripts/validate_skill.py --strict` |
 | 用户要装/更新/换宿主装这个技能 | `INSTALL.md`、`scripts/install_skill.py`（`--list-targets` / `--target auto` / `--dry-run`） |
 | 看完整范例长什么样 | `examples/draft-example.md`（读 `examples/README.md` 先） |
+| 看技术交底书范例长什么样（可直接喂给 `scripts/gen_draft.py`） | `examples/disclosure-example.md` |
 | 了解本技能的触发与行为评测 | `evals/README.md`、`evals/trigger-queries.json`、`evals/evals.json` |
 | 贡献代码或文档、想改脚本 | `CONTRIBUTING.md` |
 | 版本变更记录 | `CHANGELOG.md` |

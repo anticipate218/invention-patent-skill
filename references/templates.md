@@ -11,6 +11,7 @@
 | **Markdown 草稿 → Word** | 绝大多数用户；要交电子申请 | `.docx`（CNIPA 常见排版） | `scripts/make_docx.py` |
 | **LaTeX 模板** | 需要精确版式、批量生成、公式多 | `.pdf` / `.tex` | `assets/latex/cnipa/` |
 | **手写 Word** | 只想改现成文档 | `.docx` | — |
+| **一键整包** | 一次要齐「分部件 Word + LaTeX 源 + PDF + 自检报告」 | 一整个输出目录 | `scripts/build_all.py`（见 §五） |
 
 无论走哪条，**先用 Markdown 把内容写出来**：`scripts/check_patent.py` 的机械自检只认 Markdown 草稿，它是内容层的第一道闸门。
 
@@ -116,7 +117,42 @@ python scripts/make_docx.py --self-test
 
 ---
 
-## 五、常见问题
+## 五、一键路径：`scripts/gen_draft.py` 与 `scripts/build_all.py`
+
+前面几节是「一步一件产出」。这两个脚本把手工步骤串成两条一键路径，**仍然复用** `check_patent.py` / `check_latex.py` 的规则，不另立一套标准。
+
+### 5.1 交底书 → 草稿：`scripts/gen_draft.py`
+
+```bash
+python scripts/gen_draft.py --template > 交底书.md          # 打印交底书填空模板
+python scripts/gen_draft.py 交底书.md -o 我的申请.md         # 生成草稿（并立刻自检一遍）
+python scripts/gen_draft.py 交底书.md -o 我的申请.md --strict      # 「需要复核」也算失败
+python scripts/gen_draft.py 交底书.md -o 我的申请.md --allow-gaps  # 明知有洞，先出一版
+```
+
+- 交底书用 `##` 分节，节名容错（`技术领域`／`所属技术领域`、`背景技术`／`现有技术`……）。
+- 输出就是 §一 说的那份 Markdown 草稿，可直接接 `check_patent.py` 与 §四 的 `make_docx.py`。
+- **不编造技术内容**：交底书没给的一律留成显式缺口（`（请补：…）`）并逐条列出，有缺口时退出码为 1；`--allow-gaps` 只改退出码、不改内容。
+
+### 5.2 草稿 → 整包：`scripts/build_all.py`
+
+```bash
+python scripts/build_all.py 我的申请.md -o 输出目录                 # Word + LaTeX + 自检报告
+python scripts/build_all.py 我的申请.md -o 输出目录 --pdf           # 额外真编译 PDF
+python scripts/build_all.py 我的申请.md -o 输出目录 --no-para-number # 电子申请：关掉说明书段号
+python scripts/build_all.py 我的申请.md -o 输出目录 --keep-fontset   # 不替换 fontset，编仓库原件
+```
+
+产出：`01-说明书摘要.docx` / `02-权利要求书.docx` / `03-说明书.docx` / `04-说明书附图.docx`（**按 CNIPA 电子申请的部件分别成文**）、四个部件各自的 `src/*.md`、`latex/main.tex` + `latex/refs.bib`、`自检报告.txt` / `自检报告.json`、`manifest.json`（相对路径 + 字节数 + SHA-256）。
+
+- 报告分四节：草稿机械自检（`check_patent.py`）、LaTeX **版式结构**自检（`check_latex.py` 的结构性检查，**不编译**）、生成说明、**仍需人工处理的事项**。
+- `--pdf` 时用本机 xelatex 走 `xelatex → bibtex → xelatex ×2`，并把 `fontset=windows` 换成 `fandol` 再编（Linux 上也能过）；没有 `\cite` 时 bibtex 的非零退出码属正常噪音。
+- 退出码：`2` 用法或输入问题（缺发明名称、缺权利要求书或说明书），`1` 自检/结构/编译不过，`0` 通过。
+- **"一键"只省手工，不省判断**：报告不掩盖问题，缺附图、引证文件为空等都会明写出来。
+
+---
+
+## 六、常见问题
 
 | 症状 | 原因 | 处理 |
 |---|---|---|
@@ -127,10 +163,13 @@ python scripts/make_docx.py --self-test
 | `make_docx.py` 报"用法错误"（退出码 2） | 参数或输入路径不对 | 先跑 `python scripts/make_docx.py --self-test` 确认脚本本身正常 |
 | 转换后的 docx 版式与期望不符 | `LAYOUT` 是常见排版而非法定值 | 按 `references/format.md` §3 手工调整，或改用 LaTeX 模板 |
 | check_patent 报"附图标记在正文用了但没列出" | 删改后没同步 | 按 `references/drawings.md` §3 补全「附图标记说明」 |
+| `build_all.py` 报"用法错误"（退出码 2） | 草稿缺「发明名称」，或缺「权利要求书 / 说明书」 | 先跑 `python scripts/check_patent.py 我的申请.md` 看缺哪个部件；部件不齐打不出包 |
+| `build_all.py --pdf` 打印 `bibtex 退出码 1` | 正文里没有 `\cite`（引证文件为空） | 属**正常噪音**，脚本按「生成说明」处理、不影响退出码；补了 `refs.bib` 与 `\cmpfile` 后自然消失 |
+| `gen_draft.py` 退出码 1，但生成的草稿看着能读 | 交底书有字段没给，草稿里留了 `（请补：…）` | 读它打印的缺口清单，补交底书后重跑；确要先出一版再加 `--allow-gaps` |
 
 ---
 
-## 六、待核实项
+## 七、待核实项
 
 - **`LAYOUT` 中的具体字号、行距取值**是否与《专利审查指南》第五部分第一章 5.2 的"字高不低于 3.5 毫米、行距 2.5 毫米至 3.5 毫米"逐项对应，未逐字核对；转换后如需严格达标，请以指南原文为准（见 `references/sources.md`）。
 - **引证文件（参考文献）在法定申请文件中的地位**：法定组成文件为请求书、说明书、说明书摘要、权利要求书（`references/format.md` §2）；本模板把"引证文件"单列为一个一级部件，是**版式惯例**而非独立法定文件，此处未核实其装订顺序要求。

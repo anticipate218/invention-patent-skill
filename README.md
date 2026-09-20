@@ -21,6 +21,7 @@
 - [法律依据的版本问题（必读）](#法律依据的版本问题必读)
 - [下载与安装](#下载与安装)
 - [工作流：从交底书到申请文件](#工作流从交底书到申请文件)
+- [一键流程：从交底书到整包文件](#一键流程从交底书到整包文件)
 - [通用生成范式：七层流水线](#通用生成范式七层流水线)
 - [工具与产出物](#工具与产出物)
 - [质量保障](#质量保障)
@@ -93,6 +94,13 @@ python scripts/make_docx.py 我的申请.md -o 我的申请.docx      # 转 Word
 
 > 以上脚本都**不需要安装任何依赖**（纯 Python 标准库），也不需要联网。唯一的外部依赖是可选的：想真的把 LaTeX 模板编译成 PDF，才需要本机有 TeX 发行版。
 
+**想省掉手工？两条一键命令**（细节见[一键流程](#一键流程从交底书到整包文件)）：
+
+```bash
+python scripts/gen_draft.py 交底书.md -o 我的申请.md        # 交底书 → 申请文件草稿
+python scripts/build_all.py 我的申请.md -o 输出目录 --pdf    # 草稿 → 整包投稿文件
+```
+
 ---
 
 ## 为什么需要它
@@ -120,6 +128,7 @@ python scripts/make_docx.py 我的申请.md -o 我的申请.docx      # 转 Word
 - 检查**附图与附图标记**的双向一致性、编号规范、以及**括号按部件区分的规则**。
 - 对已有草稿跑**9 类机械自检**，每条问题给出 `references/` 里的依据小节。
 - 生成 **LaTeX / Word** 正式版式产出，并真编译验证模板还能编过。
+- **一键**把技术交底书转成申请文件草稿，或把草稿转成整包投稿文件（分部件 Word + LaTeX + PDF + 自检报告）。
 - 整理**审查意见答复**的结构、修改的三条铁律、创造性三步法的论证套路。
 - 查**流程与法定期限**（优先权、分案、答复期限与延长、登记、复审与无效）。
 
@@ -220,6 +229,8 @@ python scripts/check_patent.py --self-test     # 期望：51/51 通过
 python scripts/check_latex.py --self-test      # 期望：74/74 通过（不需要 TeX）
 python scripts/make_docx.py --self-test        # 期望：28/28 通过
 python scripts/install_skill.py --self-test    # 期望：21/21 通过
+python scripts/gen_draft.py --self-test        # 期望：48/48 通过
+python scripts/build_all.py --self-test        # 期望：103/103 通过
 python scripts/check_patent.py examples/draft-example.md --strict   # 期望：退出码 0
 ```
 
@@ -260,6 +271,7 @@ rm -rf ~/.agents/skills/invention-patent-skill
 | 5 | 写**摘要**与处理**附图** | 摘要 ≤300 字；标记括号按部件区分 |
 | 6 | 跑**机械自检** | `check_patent.py --strict`，逐条读 `basis` |
 | 7 | 产出**正式版式** | LaTeX 模板或 Word；改模板后跑 `check_latex.py` |
+| 7.5 | **一键**出初稿 / 出投稿格式 | 有交底书就能直接出草稿；草稿定了就能出整包文件（见下一节） |
 | 8 | **答复审查意见** | 先定缺陷类型，再定修改范围；三条铁律不能破 |
 
 ### 答复审查意见的三条铁律
@@ -269,6 +281,45 @@ rm -rf ~/.agents/skills/invention-patent-skill
 3. **不得做五种不予接受的修改**（指南第二部分第八章 5.2.1.3）。
 
 创造性答复用**三步法**（专利法第 22 条第 3 款）：确定最接近的现有技术 → 确定区别特征与实际解决的技术问题 → 判断对本领域技术人员是否显而易见。主张"公知常识"要有举证。
+
+---
+
+## 一键流程：从交底书到整包文件
+
+前七步是**人写**的流程。用户说"帮我先出一版"或"给我能提交的文件"时，用下面两个脚本把手工步骤串起来——它们只做**搬运、编号、套模板、排版和自检**，不产生任何交底书里没有的技术内容。
+
+### 一键出初稿：`scripts/gen_draft.py`
+
+```bash
+python scripts/gen_draft.py --template > 交底书.md            # 先拿一份交底书填空模板
+python scripts/gen_draft.py 交底书.md -o 我的申请.md           # 生成草稿（并立刻自检一遍）
+python scripts/gen_draft.py 交底书.md -o 我的申请.md --strict       # 连「需要复核」也当失败
+python scripts/gen_draft.py 交底书.md -o 我的申请.md --allow-gaps   # 明知有洞，先出一版
+```
+
+交底书用 `##` 分节，节名有容错（`技术领域`／`所属技术领域`、`背景技术`／`现有技术`、`技术问题`／`要解决的技术问题`……）。输出就是 `check_patent.py` 能直接自检的那套结构：`# 发明名称：…` + 说明书摘要 / 权利要求书 / 说明书（五部分）/ 说明书附图。
+
+**它绝不替你编技术方案。** 交底书没给的一律留成显式缺口（`（交底书未给出名称）`、`…（请补：…）`），并在报告里逐条列出；有缺口时退出码是 1，`--allow-gaps` 只是让你显式承认"我知道有洞"。交底书范例见 `examples/disclosure-example.md`。
+
+### 一键出投稿格式：`scripts/build_all.py`
+
+```bash
+python scripts/build_all.py 我的申请.md -o 输出目录                  # Word + LaTeX + 自检报告
+python scripts/build_all.py 我的申请.md -o 输出目录 --pdf            # 额外真编译一份 PDF
+python scripts/build_all.py 我的申请.md -o 输出目录 --no-para-number  # 电子申请：去掉说明书段号
+```
+
+| 产物 | 说明 |
+|---|---|
+| `01-说明书摘要.docx` / `02-权利要求书.docx` / `03-说明书.docx` / `04-说明书附图.docx` | **按 CNIPA 电子申请的部件分别成文**——上传入口本来就按部件分，合成一个文件反而要再拆 |
+| `src/*.md` | 四个部件各自的 Markdown 源文，便于逐件核对与复用 |
+| `latex/main.tex` + `latex/refs.bib` | 可直接编译的申请文件源（`--pdf` 时用本机 xelatex 编出 PDF） |
+| `自检报告.txt` / `自检报告.json` | `check_patent.py` 的机械校验 + `check_latex.py` 的结构性检查（不编译）+ 生成说明 + 仍需人工处理的事项 |
+| `manifest.json` | 每个产物的相对路径、字节数与 sha256（可复现：不含时间戳与绝对路径；`--pdf` 的 PDF 例外，xelatex 会往 PDF 里写生成时间） |
+
+退出码：`2` 用法或输入有问题（草稿不存在、缺发明名称、缺权利要求书或说明书）；`1` 机械自检不过、LaTeX 结构不被豁免地不过、或 `--pdf` 编译失败；`0` 通过。
+
+> **"一键"只省手工，不省判断。** 生成器不补技术内容，报告也**不掩盖**问题——`【仍需人工处理的事项】` 那一节照旧要求你逐条处理，**机械校验通过仍然 ≠ 法律合规**。
 
 ---
 
@@ -321,6 +372,15 @@ python scripts/check_patent.py --self-test              # 脚本自身固件测�
 
 > **脚本只做机械校验。** 它不判断新颖性、创造性、保护范围，也不判断权项是否得到说明书支持——那些必须人工（或代理师）复核。
 
+### 一键脚本
+
+| 脚本 | 做什么 | 固件测试 |
+|---|---|---|
+| `scripts/gen_draft.py` | 技术交底书（Markdown）→ 申请文件草稿；`--template` 打印交底书填空模板 | **48 项** |
+| `scripts/build_all.py` | 草稿 → 整包投稿文件（4 个分部件 `.docx` + `src/*.md` + LaTeX 源 + 可选 PDF + 自检报告 + `manifest.json`） | **103 项** |
+
+两个脚本都**复用** `check_patent.py` / `check_latex.py` 的规则，不另立一套合规标准；发现的问题原样打印，缺口不掩盖。用法与产物清单见[一键流程](#一键流程从交底书到整包文件)。
+
 ### 现成片段（`assets/`）
 
 | 文件 | 用途 |
@@ -336,6 +396,7 @@ python scripts/check_patent.py --self-test              # 脚本自身固件测�
 |---|---|
 | PDF（打印/提交） | `assets/latex/cnipa/main.tex`，编译步骤见 `assets/latex/README.md` |
 | Word | `python scripts/make_docx.py 我的申请.md -o 输出.docx` |
+| Word（分部件）+ LaTeX + 自检报告 + manifest | `python scripts/build_all.py 我的申请.md -o 输出目录`（加 `--pdf` 顺带真编译） |
 | Markdown | 直接用草稿 |
 
 LaTeX 模板已按《专利审查指南》**第五部分第一章 4.1～5.6** 的版式要求做好：A4（297×210 mm）、上/左/右/下页边距 25/25/15/15 mm、字体字高不低于 3.5 mm、行距 2.5～3.5 mm、黑色、页码连续。**电子申请要把段号开关关掉**——见 `assets/latex/README.md` §4。
@@ -343,6 +404,8 @@ LaTeX 模板已按《专利审查指南》**第五部分第一章 4.1～5.6** �
 ### 完整范例
 
 `examples/draft-example.md` 是一件虚构发明「一种传送带异物视觉检测方法」的完整申请文件：**1 项独权 + 6 项从权**、摘要 184 字，通过 `--strict`。读法、验证命令与**不能照抄**的部分见 `examples/README.md`。
+
+`examples/disclosure-example.md` 是同一件发明的**技术交底书**，可直接喂给 `scripts/gen_draft.py` 走通一键出稿：交底书 → 草稿 → 整包投稿文件。
 
 ---
 
@@ -355,11 +418,13 @@ LaTeX 模板已按《专利审查指南》**第五部分第一章 4.1～5.6** �
 | 结构 | `python scripts/validate_skill.py . --strict` | frontmatter 字段白名单、`name` 与目录一致、description/compatibility 长度、正文行数、**文件引用是否存在**、未索引文件、Windows 风格路径 |
 | 自检工具 | `python scripts/check_patent.py --self-test` | **51 项**固件：9 类检查的"该报的报、不该报的不报"两侧都测（含 HTML 注释不计字数、正文裸标记不算"没用到"、单字"等"的开放式列举与"等间距"这类固定词的区分） |
 | 范例回归 | `python scripts/check_patent.py examples/draft-example.md --strict` | 完整范例必须始终能过 |
+| 一键出稿 | `python scripts/gen_draft.py --self-test` | **48 项**固件：交底书节名容错、缺口必须显式留白（**不许编**）、标点归一化、生成结果仍过 `check_patent`、`--allow-gaps` 只改退出码不改内容 |
+| 一键出格式 | `python scripts/build_all.py --self-test` | **103 项**固件：LaTeX 转义与标记映射、四个部件各自成文、`--no-para-number` 真的关掉段号、缺附图时不误报、产物**可复现**（换父目录再打一次包，整份 manifest 完全一致；无时间戳与绝对路径）、退出码分级 |
 | 安装器 | `python scripts/install_skill.py --self-test` | **21 项**固件：复制时确实丢掉 `.git`/`__pycache__`、已存在时先拒绝再 `--force`、**非本技能的目录一律不删**、`--dry-run` 不写盘、带/不带顶层前缀的 ZIP 都能解、`auto` 挑选顺序、**指向别人的技能目录时拒绝**、带 UTF-8 BOM 的 `SKILL.md` 仍可识别 |
 | Word 生成 | `python scripts/make_docx.py --self-test` | **28 项**固件：Markdown 解析、OOXML 转义、A4 与页边距、段落编号续号、**逐字节可复现**、坏包被拒 |
 | 依赖边界 | 见 `.github/workflows/ci.yml` | AST 扫描 `scripts/*.py`，禁止引入 requests/numpy/lxml 等外部依赖 |
 | 模板真编译 | `python scripts/check_latex.py --require`（CI）/ `--self-test`（本机无需 TeX） | 在临时目录里真的编译模板（`xelatex → bibtex → xelatex ×2`），核对硬错误、未解析引用、字体替换、页数下限，以及**一级部件顺序**、**说明书五部分顺序**、**版式参数**、**权利要求编号与引用** |
-| 触发与行为评测 | 见 `evals/` | **35 条**触发查询（正例 + near-miss 负例）测 description 触发率；**12 条**行为用例含**反幻觉断言**（不得编造条号或页码；不得越位断言可授权/侵权） |
+| 触发与行为评测 | 见 `evals/` | **35 条**触发查询（正例 + near-miss 负例）测 description 触发率；**14 条**行为用例含**反幻觉断言**与**一键路径断言**（不得编造条号或页码；不得越位断言可授权/侵权） |
 
 其中 `validate_skill.py` 对所有 Agent Skill 作者都有用：它专门拦"跨工具分发时会硬报错"的 frontmatter 问题（比如多写了非标准字段）。
 
@@ -381,10 +446,12 @@ invention-patent-skill/
 │   ├── prosecution.md            # 审查意见答复与修改边界
 │   ├── procedure.md              # 流程与法定期限（优先权、分案、复审无效）
 │   ├── checklists.md             # 提交前后逐项自查清单
-│   ├── templates.md              # 三条产出路线、模板与编译答疑
+│   ├── templates.md              # 三条产出路线、一键路径、模板与编译答疑
 │   └── sources.md                # 法规现行版本、检索工具、引用规范
 ├── scripts/
 │   ├── check_patent.py           # 申请文件机械自检（9 类检查，纯标准库）
+│   ├── gen_draft.py              # 技术交底书 → 申请文件草稿（一键出稿）
+│   ├── build_all.py              # 草稿 → 整包投稿文件（分部件 Word + LaTeX + PDF + 自检报告）
 │   ├── check_latex.py            # 真编译 LaTeX 模板并体检结构性约束
 │   ├── make_docx.py              # Markdown → Word（纯标准库生成 OOXML）
 │   ├── install_skill.py          # 装进宿主技能目录（默认不覆盖 / 装完自校验）
@@ -399,6 +466,7 @@ invention-patent-skill/
 │       └── cnipa/                # 可直接编译的申请文件模板（main.tex + refs.bib）
 ├── examples/
 │   ├── draft-example.md          # 完整范例：一种传送带异物视觉检测方法
+│   ├── disclosure-example.md     # 范例的技术交底书（可直接喂给 gen_draft.py）
 │   └── README.md                 # 范例读法、验证命令与不能照抄的部分
 ├── evals/                        # 触发评测与行为用例（含 near-miss 负例）
 ├── .github/workflows/ci.yml      # 持续集成
@@ -410,7 +478,7 @@ invention-patent-skill/
 └── LICENSE
 ```
 
-设计上遵循 Agent Skills 的**渐进式披露**原则：`SKILL.md` 只放"每次都要用到"的核心流程（正文 197 行），详细资料放进 `references/` 由助手按需读取。
+设计上遵循 Agent Skills 的**渐进式披露**原则：`SKILL.md` 只放"每次都要用到"的核心流程（正文 242 行），详细资料放进 `references/` 由助手按需读取。
 
 ---
 

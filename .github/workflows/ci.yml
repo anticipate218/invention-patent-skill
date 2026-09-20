@@ -33,8 +33,47 @@ jobs:
       - name: Word 生成器固件测试（OOXML 结构 / 版式参数 / 逐字节可复现）
         run: python scripts/make_docx.py --self-test
 
+      # "一键出稿"的固件测试重点在两件事：交底书没给的东西必须留成显式缺口
+      # （不许编），以及生成出来的草稿仍然过 check_patent。
+      - name: 一键出稿固件测试（交底书解析 / 缺口不掩盖 / 生成稿仍过自检）
+        run: python scripts/gen_draft.py --self-test
+
+      # "一键出格式"的固件测试重点在：LaTeX 转义与标记映射、四个部件各自成文、
+      # 缺附图时不误报、段号开关真的生效、以及产物可复现（manifest 无时间戳与绝对路径）。
+      - name: 一键出格式固件测试（产物清单 / 退出码分级 / 可复现）
+        run: python scripts/build_all.py --self-test
+
       - name: 范例草稿仍能通过机械自检
         run: python scripts/check_patent.py examples/draft-example.md --strict
+
+      # 两条一键路径的端到端回归：交底书 →（gen_draft.py）→ 草稿 →（check_patent.py）→ 通过，
+      # 再从范例草稿出一次整包（这里不编译；真编译由下面的 latex 任务负责）。
+      #
+      # 断言用 Python 而不是 shell 的 test -f：产物名里有中文，
+      # 别让 runner 的 locale 决定这一步的成败。
+      - name: 一键流程端到端（交底书 → 草稿 → 整包）
+        run: |
+          mkdir -p /tmp/e2e
+          python scripts/gen_draft.py examples/disclosure-example.md -o /tmp/e2e/draft.md --strict
+          python scripts/check_patent.py /tmp/e2e/draft.md --strict
+          python scripts/build_all.py examples/draft-example.md -o /tmp/e2e/pkg
+          python - <<'PY'
+          import json, pathlib
+          pkg = pathlib.Path("/tmp/e2e/pkg")
+          names = sorted(p.name for p in pkg.iterdir())
+          print("产物：")
+          for n in names:
+              print("  " + n)
+          report = json.loads((pkg / "自检报告.json").read_text(encoding="utf-8"))
+          manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+          docx = [n for n in names if n.endswith(".docx")]
+          assert len(docx) == 4, "分部件 Word 应有 4 个，实际 %s" % docx
+          assert report["ok"] is True, "自检报告应为通过，problems=%s" % report["problems"]
+          assert report["latex"]["ok"] is True, "LaTeX 结构性检查应全通过"
+          assert report["pdf"]["requested"] is False, "这一步不应请求编译"
+          assert len(manifest["files"]) >= len(docx), "manifest 应覆盖全部产物"
+          print("一键流程端到端通过")
+          PY
 
       # README 里那句「一句话安装」把 raw 链接当作唯一入口；链接写错或文件没推上去，
       # 用户复制过去就是一个 404。这里把这条契约钉死在 CI 里。
@@ -153,3 +192,22 @@ jobs:
       # fandol（Linux 上没有 Windows 字体）。要验原始文件就加 --keep-fontset。
       - name: 编译 CNIPA 模板并体检
         run: python scripts/check_latex.py --require
+
+      # 上面那步编的是仓库里手写的模板；这步编的是"一键出格式"从一个真实草稿
+      # 现场生成的申请文件（main.tex 由 build_all.py 产出）。
+      # build_all.py 会自己把 fontset=windows 换成 fandol 再编，所以 Linux 上能过；
+      # 它同时核对硬错误、页数与产物大小，编不出来就返回非零。
+      - name: 一键出格式真编译（草稿 → 整包 → PDF）
+        run: |
+          python scripts/build_all.py examples/draft-example.md -o /tmp/pkg --pdf
+          python - <<'PY'
+          import json, pathlib
+          pkg = pathlib.Path("/tmp/pkg")
+          report = json.loads((pkg / "自检报告.json").read_text(encoding="utf-8"))
+          manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+          assert report["pdf"]["ok"] is True, "PDF 没编出来：%s" % report["pdf"]["problem"]
+          pdf = [e for e in manifest["files"] if e["path"].endswith(".pdf")]
+          assert pdf, "manifest 里应记着 PDF"
+          print("PDF：%s（%d 字节）" % (pdf[0]["path"], pdf[0]["bytes"]))
+          print("一键出格式真编译通过")
+          PY

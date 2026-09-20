@@ -12,6 +12,68 @@
 
 ---
 
+## [1.2.0] - 2026-09-20
+
+给技能加上**两条一键路径**：一键把技术交底书转成申请文件草稿，一键把草稿输出成整包投稿文件。
+
+### 新增
+
+- **`scripts/gen_draft.py`（48 项固件测试）** —— 技术交底书（Markdown）→
+  申请文件草稿。交底书用 `##` 分节、节名有容错；输出即 `check_patent.py`
+  能直接自检的结构（`# 发明名称：…` + 摘要 / 权利要求书 / 说明书五部分 / 说明书附图）。
+  - `--template` 打印交底书填空模板；`--strict` 把「需要复核」也当失败；
+    `--allow-gaps` 显式承认"知道有洞，先出一版"；`--json` 输出机器可读报告。
+  - 三条设计原则与 `SKILL.md` 的三条铁律对齐：**不编造技术内容**（缺什么就留
+    `（请补：…）` 这样的显式缺口并逐条列出）、**生成即可自检**（直接复用
+    `check_patent.run_checks`，不另立一套合规规则）、**不掩盖缺口**（有缺口时退出码为 1）。
+- **`scripts/build_all.py`（103 项固件测试）** —— 草稿 → 整包投稿文件：
+  - 四个**分部件** `.docx`（`01-说明书摘要` / `02-权利要求书` / `03-说明书` /
+    `04-说明书附图`），对应 CNIPA 电子申请按部件上传的入口；另有 `src/*.md`
+    保存各部件 Markdown 源文，便于逐件核对。
+  - `latex/main.tex` + `latex/refs.bib`：可直接编译的申请文件源；`--pdf` 时
+    用本机 xelatex 走完 `xelatex → bibtex → xelatex ×2` 并核对页数与硬错误。
+  - `自检报告.txt` / `自检报告.json`：`check_patent.py` 的机械校验 +
+    `check_latex.py` 的结构性检查（不编译）+ 生成说明 + **仍需人工处理的事项**。
+  - `manifest.json`：每个产物的相对路径、字节数与 sha256。除 `--pdf` 的 PDF 外，
+    产物**逐字节可复现**——不写时间戳、不写绝对路径、换行统一为 `\n`；
+    固件测试会换一个父目录再打一次包，断言整份 manifest 完全一致。
+    （PDF 本身由 xelatex 写入生成时间与文件 ID，两次编译字节不同，这不属本脚本可控范围。）
+  - `--no-para-number` 关掉说明书段号（电子申请用）；`--keep-fontset` 保留
+    `fontset=windows` 不替换；`--strict` 把「需要复核」也当失败。
+  - 退出码分级：`2` 用法/输入问题，`1` 自检或编译不过，`0` 通过。
+- **`examples/disclosure-example.md`** —— 范例发明「一种传送带异物视觉检测方法」的
+  **技术交底书**，可直接喂给 `gen_draft.py` 走通"交底书 → 草稿 → 整包文件"。
+
+### 变更
+
+- **`SKILL.md`** —— 第 0 步新增「手上有没有交底书」一行；第 1 步路由表新增两条
+  一键路径；新增**第 7.5 步「一键出稿 / 一键出格式」**；参考文件索引补入
+  `scripts/gen_draft.py`、`scripts/build_all.py`、`examples/disclosure-example.md`；
+  正文 197 → **242 行**。
+- **`README.md`** —— 快速开始补两条一键命令；新增「一键流程：从交底书到整包文件」
+  小节；工作流表补 7.5 行；工具与产出物、质量保障、仓库结构、范例说明同步更新。
+- **`.github/workflows/ci.yml`** —— 新增 `gen_draft.py --self-test`、
+  `build_all.py --self-test` 两项固件测试，一条"交底书 → 草稿 → `check_patent --strict`"
+  的端到端回归，以及 LaTeX 任务里用 `build_all.py --pdf` 真编译生成的申请文件包。
+- **`evals/`** —— 行为用例 12 → **14 条**：新增 `e13`（一键出格式：分件 `.docx`、
+  退出码语义、PDF 例外与"打包通过 ≠ 合规"）与 `e14`（一键出稿：法定顺序草稿、
+  缺口占位、`--allow-gaps` 与生成后必须接跑 `check_patent.py`），
+  对应 `evals/README.md` §三的"新增能力同步补一条行为用例"约定。
+- **`SKILL.md` metadata 与 `CITATION.cff`** —— 版本 `1.1.0` → `1.2.0`。
+
+### 说明
+
+- 本次**不改变任何既有的检查规则，也不新增或修改法条依据**：两个新脚本复用
+  `check_patent.py` 与 `check_latex.py`，`references/{claims,format,specification,drawings}.md`
+  的小节编号未动（`check_patent.py` 的 `basis` 字段指向它们）。
+- **"一键"只省手工，不省判断**：生成器不补技术内容，报告不掩盖问题，
+  `SKILL.md` 的免责声明与"机械校验通过 ≠ 法律合规"照旧适用。
+- 全部固件测试与 `validate_skill.py --strict` 通过：`check_patent.py`（51 项）、
+  `check_latex.py`（74 项）、`make_docx.py`（28 项）、`install_skill.py`（21 项）、
+  `gen_draft.py`（48 项）、`build_all.py`（103 项）。
+
+---
+
 ## [1.1.0] - 2026-09-20
 
 把技能从"分主题的规则汇编"补齐为**领域无关的通用生成范式**。

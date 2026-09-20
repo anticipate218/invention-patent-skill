@@ -5,6 +5,7 @@
 | 文件 | 内容 |
 | --- | --- |
 | `draft-example.md` | 一份完整的发明专利申请文件范例（摘要 + 权利要求书 + 说明书 + 说明书附图说明），可直接喂给 `scripts/check_patent.py` |
+| `disclosure-example.md` | 同一件发明的**技术交底书**范例，可直接喂给 `scripts/gen_draft.py` 一键出稿 |
 | `README.md` | 本文件：范例的读法、验证命令、输出含义、以及**不要照抄**的地方 |
 
 ---
@@ -67,6 +68,15 @@ python scripts/check_patent.py examples/draft-example.md --strict
 python scripts/check_patent.py examples/draft-example.md --json
 ```
 
+把**交底书范例**一键转成草稿，再出整包投稿文件：
+
+```bash
+python scripts/gen_draft.py examples/disclosure-example.md -o 我的申请.md --strict
+python scripts/build_all.py 我的申请.md -o 输出目录 --pdf
+```
+
+`--strict` 表示「需要复核」的项也当失败——交底书里没给的字段会被留成显式缺口（`（请补：…）`）而不是编一个，所以缺东西时它会直接失败给你看。
+
 ---
 
 ## 四、输出怎么理解
@@ -87,15 +97,27 @@ python scripts/check_patent.py examples/draft-example.md --json
 
 - **技术内容是虚构的**，参数（3×3 邻域、16×16 图像块、3 倍均值等）只是为了让文字自洽，**没有经过任何实验验证**。你自己的申请必须写你真实做出并验证过的技术方案。
 - **不是真实申请文件**，没有经过任何代理师或审查员核查，也**未做过新颖性/创造性检索**。范例通过机械校验，只说明其**形式**合规。
-- **`draft-example.md` 不是交底书**。它是交底书经过撰写加工后的成品形态；如果你手上只有技术交底材料，先走 `references/drafting-playbook.md` 的流程。
+- **`draft-example.md` 是撰写加工后的成品形态，不是交底书。** 同一件发明的**交底书形态**放在 `disclosure-example.md`：从那份开始才能看到「原始素材 → 成品」之间被补了什么、被规范了什么。你手上只有技术交底材料时，先走 `references/drafting-playbook.md` 的流程，或用 `scripts/gen_draft.py` 出一版草稿再逐条补。
 - **正文标记不带括号，权利要求标记带括号**——这两处写法不同是**故意的**，不是笔误。规则差异见 `references/drawings.md` §2.1。
 - 范例没有涉及：序列表（无氨基酸/核苷酸序列）、彩色附图或照片、PCT/优先权、以及审查意见答复。这些情形请查 `references/specification.md`、`references/drawings.md`、`references/procedure.md`、`references/prosecution.md`。
 
 ---
 
-## 六、想再要更多范例？
+## 六、交底书范例：从原始素材到成品
 
-本目录刻意只保留**一个**完整范例，避免维护出互相矛盾的「参考答案」。
+`disclosure-example.md` 是**同一件发明**的技术交底书，用 `##` 分节（发明名称 / 技术领域 / 背景技术 / 技术问题 / 独权前序 / 必要技术特征 / 特征部分引导语 / 附加技术特征 / 有益效果 / 附图 / 附图标记 / 实施例 / 摘要）。它的价值在于**对照**：
+
+- 交底书写「必要技术特征」时用的是技术人员的话，成品里的独权要变成规范的「前序部分 + 特征部分」；
+- 交底书里的附图标记可能只给了编号，成品必须给每个标记配名称、并保证双向一致；
+- 交底书没有的东西（这里刻意留了几处），`gen_draft.py` **不会替你编**，而是在草稿里留下 `（请补：…）` 并在报告里逐条列出。
+
+所以这份交底书同时也是「生成器不会编技术内容」这一承诺的**活体证据**：跑一遍，看它把哪些洞报了出来。
+
+---
+
+## 七、想再要更多范例？
+
+本目录刻意只保留**一件**发明（交底书形态 + 成品形态各一份），避免维护出互相矛盾的「参考答案」。
 
 需要别的题材时，用骨架先搭结构再填内容：
 
@@ -108,9 +130,10 @@ python scripts/check_patent.py 我的申请.md --strict
 
 ---
 
-## 七、相关文档
+## 八、相关文档
 
-- `../SKILL.md` —— 技能总入口与工作流
+- `../SKILL.md` —— 技能总入口与工作流（第 7.5 步：一键出稿 / 一键出格式）
+- `../references/drafting-playbook.md` —— 从交底书到申请文件的全流程
 - `../references/drawings.md` —— 附图与附图标记规则（含括号按部件区分）
 - `../references/claims.md` —— 权利要求撰写与清楚措辞
 - `../assets/patent-outline.md` —— 填写式骨架
